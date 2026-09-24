@@ -113,7 +113,7 @@ function sendHtml(response: ServerResponse, status: number, html: string, nonce?
     response.writeHead(status, {
         'Content-Type': 'text/html; charset=utf-8',
         'Cache-Control': 'no-store',
-        'Content-Security-Policy': `default-src 'none'; style-src 'unsafe-inline'; connect-src 'self'; ${
+        'Content-Security-Policy': `default-src 'none'; style-src 'unsafe-inline'; img-src data:; connect-src 'self'; ${
             nonce ? `script-src 'nonce-${nonce}'; ` : ''
         }frame-ancestors 'none'; base-uri 'none'`,
         'Referrer-Policy': 'no-referrer',
