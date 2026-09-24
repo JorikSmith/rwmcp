@@ -4,6 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { Config } from './config.js';
 import { log, type OAuthServer } from './oauth.js';
+import { FAVICON_PNG } from './pages.js';
 import { API_VERSION, COMPONENT_SCHEMAS, OPERATIONS } from './operations.generated.js';
 import { PanelClient } from './panel.js';
 import type { Grant } from './store.js';
@@ -42,7 +43,12 @@ function header(request: IncomingMessage, name: string): string | undefined {
 function createMcpServer(config: Config, panel: PanelClient, grant: Grant): McpServer {
     const readOnly = config.readOnly || grant.readOnly;
     const server = new McpServer(
-        { name: 'rwmcp', version: VERSION },
+        {
+            name: 'rwmcp',
+            title: 'Remnawave',
+            version: VERSION,
+            icons: [{ src: `${config.publicUrl}/favicon.png`, mimeType: 'image/png', sizes: ['192x192'] }],
+        },
         {
             instructions:
                 `Tools for the Remnawave panel API ${API_VERSION}. Each tool is one API endpoint. ` +
@@ -138,6 +144,14 @@ export async function startHttpServer(config: Config, oauth: OAuthServer): Promi
             for (const [name, value] of Object.entries(CORS_HEADERS)) response.setHeader(name, value);
 
             if (url.pathname === '/healthz') return sendJson(response, 200, { status: 'ok' });
+            if (url.pathname === '/favicon.png' || url.pathname === '/favicon.ico') {
+                response.writeHead(200, {
+                    'Content-Type': 'image/png',
+                    'Cache-Control': 'public, max-age=86400',
+                });
+                response.end(FAVICON_PNG);
+                return;
+            }
             if (url.pathname === '/mcp') return await handleMcp(request, response);
             if (await oauth.handle(request, response, url)) return;
             sendJson(response, 404, { error: 'Not found' });
