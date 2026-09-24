@@ -1,0 +1,18 @@
+services:
+    rwmcp:
+        image: ghcr.io/joriksmith/rwmcp:latest
+        container_name: rwmcp
+        restart: unless-stopped
+        env_file: .env
+        volumes:
+            - rwmcp-data:/data
+        networks:
+            - remnawave-network
+
+volumes:
+    rwmcp-data:
+
+networks:
+    remnawave-network:
+        name: remnawave-network
+        external: true

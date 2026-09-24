@@ -1,0 +1,33 @@
+{
+    "name": "rwmcp",
+    "version": "0.1.0",
+    "description": "MCP server for the Remnawave panel API",
+    "type": "module",
+    "bin": {
+        "rwmcp": "dist/index.js"
+    },
+    "scripts": {
+        "build": "tsup",
+        "start": "node dist/index.js",
+        "typecheck": "tsc --noEmit",
+        "openapi:generate": "node scripts/generate-operations.mjs",
+        "openapi:update": "node scripts/update-openapi.mjs"
+    },
+    "license": "MIT",
+    "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.30.0",
+        "zod": "^3.25.76"
+    },
+    "devDependencies": {
+        "@remnawave/backend-contract": "^3.4.15",
+        "@types/node": "^22.20.2",
+        "tsup": "^8.0.0",
+        "typescript": "^5.7.0"
+    },
+    "engines": {
+        "node": ">=22"
+    },
+    "overrides": {
+        "esbuild": "0.28.1"
+    }
+}
