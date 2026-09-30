@@ -124,7 +124,7 @@ rwmcp revoke --all   # отключить всех
 
 ```env
 READ_ONLY=true           # всем клиентам только чтение
-REDACT_SECRETS=false     # не прятать приватные ключи нод и пароли пользователей
+REDACT_SECRETS=false     # не прятать приватные ключи, креды пользователей и ссылки подписок
 REMNAWAVE_API_KEY=...    # если панель закрыта через Caddy с ключом
 REMNAWAVE_COOKIE=...     # если панель закрыта через nginx с secret cookie
 TRUST_PROXY=1            # сколько прокси перед rwmcp

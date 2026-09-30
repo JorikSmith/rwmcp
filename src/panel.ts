@@ -11,7 +11,12 @@ const TIMEOUT_MS = 30_000;
 
 function errorMessage(body: unknown, status: number, statusText: string): string {
     if (typeof body === 'object' && body !== null) {
-        const candidate = body as { message?: unknown; error?: unknown; errorCode?: unknown };
+        const candidate = body as {
+            message?: unknown;
+            error?: unknown;
+            errorCode?: unknown;
+            errors?: unknown;
+        };
         const message =
             typeof candidate.message === 'string'
                 ? candidate.message
@@ -19,7 +24,17 @@ function errorMessage(body: unknown, status: number, statusText: string): string
                   ? candidate.error
                   : undefined;
         const code = typeof candidate.errorCode === 'string' ? ` (${candidate.errorCode})` : '';
-        if (message) return `HTTP ${status}: ${message}${code}`;
+        const details = Array.isArray(candidate.errors)
+            ? candidate.errors
+                  .filter(isRecord)
+                  .map((issue) => {
+                      const path = Array.isArray(issue.path) ? issue.path.join('.') : '';
+                      return `${path ? `${path}: ` : ''}${valueToString(issue.message)}`;
+                  })
+            : [];
+        if (message) {
+            return `HTTP ${status}: ${message}${code}${details.length ? `\n${details.join('\n')}` : ''}`;
+        }
     }
     return `HTTP ${status}${statusText ? ` ${statusText}` : ''}`;
 }
@@ -150,7 +165,9 @@ export class PanelClient {
                 continue;
             }
             if (Array.isArray(value)) {
-                if (parameter.explode) {
+                if (value.some((item) => typeof item === 'object' && item !== null)) {
+                    search.append(parameter.name, JSON.stringify(value));
+                } else if (parameter.explode) {
                     value.forEach((item) => search.append(parameter.name, valueToString(item)));
                 } else {
                     search.append(parameter.name, value.map(valueToString).join(','));

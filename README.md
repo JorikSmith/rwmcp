@@ -124,7 +124,7 @@ All sign-in attempts are logged to `docker logs rwmcp`
 
 ```env
 READ_ONLY=true           # read-only for every client
-REDACT_SECRETS=false     # don't hide node private keys and user passwords
+REDACT_SECRETS=false     # show private keys, user credentials and subscription links as is
 REMNAWAVE_API_KEY=...    # if the panel is behind Caddy with a key
 REMNAWAVE_COOKIE=...     # if the panel is behind nginx with a secret cookie
 TRUST_PROXY=1            # number of proxies in front of rwmcp

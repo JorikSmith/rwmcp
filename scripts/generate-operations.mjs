@@ -15,6 +15,7 @@ const EXCLUDED_TAGS = new Set([
     'Passkeys Controller',
     'API Tokens Controller',
     '[Public] Subscription Controller',
+    'Remnawave Settings Controller',
 ]);
 
 const source = await readFile(sourcePath, 'utf8');

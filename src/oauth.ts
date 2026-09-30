@@ -9,7 +9,9 @@ const CODE_TTL_MS = 60_000;
 const ACCESS_TOKEN_TTL_SEC = 3600;
 const REFRESH_TOKEN_TTL_MS = 30 * 86_400_000;
 const REFRESH_GRACE_MS = 60_000;
+const MAX_REFRESH_TOKENS = 5;
 const MAX_PENDING = 50;
+const MAX_PENDING_PER_IP = 3;
 const MAX_BODY_BYTES = 64 * 1024;
 
 export const APPROVE_COMMAND = 'rwmcp approve';
@@ -300,6 +302,9 @@ export class OAuthServer {
         }
 
         this.prune();
+        const ip = clientIp(request, this.config.trustProxy);
+        const fromIp = [...this.pending.values()].filter((item) => item.ip === ip && !item.decision);
+        if (fromIp.length >= MAX_PENDING_PER_IP) this.pending.delete(fromIp[0].id);
         if (this.pending.size >= MAX_PENDING) return fail('temporarily_unavailable');
 
         const now = Date.now();
@@ -311,7 +316,7 @@ export class OAuthServer {
             redirectUri,
             state,
             codeChallenge,
-            ip: clientIp(request, this.config.trustProxy),
+            ip,
             createdAt: now,
             expiresAt: now + REQUEST_TTL_MS,
         };
@@ -436,11 +441,16 @@ export class OAuthServer {
 
         const refreshToken = randomId('rwrt_');
         const now = Date.now();
-        if (grant.refreshHash) {
-            grant.previousRefreshHash = grant.refreshHash;
+        const presented =
+            grantType === 'refresh_token' ? this.store.hash(form.get('refresh_token') ?? '') : '';
+        if (grant.refreshHashes.includes(presented)) {
+            grant.refreshHashes = grant.refreshHashes.filter((hash) => hash !== presented);
+            grant.previousRefreshHash = presented;
             grant.previousRefreshValidUntil = now + REFRESH_GRACE_MS;
         }
-        grant.refreshHash = this.store.hash(refreshToken);
+        grant.refreshHashes = [...grant.refreshHashes, this.store.hash(refreshToken)].slice(
+            -MAX_REFRESH_TOKENS,
+        );
         grant.refreshExpiresAt = now + REFRESH_TOKEN_TTL_MS;
         grant.lastUsedAt = now;
         await this.store.putGrant(grant);
@@ -476,7 +486,7 @@ export class OAuthServer {
             readOnly: issued.readOnly,
             createdAt: Date.now(),
             lastUsedAt: Date.now(),
-            refreshHash: '',
+            refreshHashes: [],
             refreshExpiresAt: 0,
         };
     }

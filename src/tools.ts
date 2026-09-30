@@ -2,7 +2,13 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z, type ZodTypeAny } from 'zod';
 import type { OperationDescriptor, ParameterDescriptor } from './operations.js';
 import type { OperationInput, PanelClient } from './panel.js';
-import { REDACTED, SECRET_PRODUCERS, redactSecrets } from './redact.js';
+import {
+    REDACTED_MARK,
+    REDACTED_NOTE,
+    SECRET_PRODUCERS,
+    redactSecrets,
+    restoreSecrets,
+} from './redact.js';
 import { openApiSchema, type ComponentSchemas } from './schema.js';
 
 export interface ToolOptions {
@@ -10,7 +16,12 @@ export interface ToolOptions {
     redactSecrets: boolean;
 }
 
-const DESTRUCTIVE = /(^|_)(delete|delte|remove|truncate|revoke|drop|reset|restart)(_|$)/;
+const ADDITIVE = /(^|_)(create|clone|add)(_|$)/;
+
+function isNumeric(schema: unknown): boolean {
+    const type = (schema as { type?: unknown } | undefined)?.type;
+    return type === 'number' || type === 'integer';
+}
 
 function parameterObject(
     parameters: readonly ParameterDescriptor[],
@@ -20,6 +31,15 @@ function parameterObject(
     const fields: Record<string, ZodTypeAny> = {};
     for (const parameter of parameters) {
         let schema = openApiSchema(parameter.schema, components);
+        if (isNumeric(parameter.schema)) {
+            schema = z.preprocess(
+                (value) =>
+                    typeof value === 'string' && value.trim() && !Number.isNaN(Number(value))
+                        ? Number(value)
+                        : value,
+                schema,
+            );
+        }
         if (parameter.description) schema = schema.describe(parameter.description);
         fields[parameter.name] = parameter.required ? schema : schema.optional();
     }
@@ -57,14 +77,16 @@ function description(operation: OperationDescriptor): string {
     return parts.join('\n\n');
 }
 
-function text(value: string, isError = false) {
-    return { content: [{ type: 'text' as const, text: value }], ...(isError ? { isError } : {}) };
+function text(value: string, isError = false, note?: string) {
+    const content = [{ type: 'text' as const, text: value }];
+    if (note) content.push({ type: 'text' as const, text: note });
+    return { content, ...(isError ? { isError } : {}) };
 }
 
 export function isDestructive(operation: OperationDescriptor): boolean {
     return (
         operation.kind === 'write' &&
-        (operation.method === 'DELETE' || DESTRUCTIVE.test(operation.name))
+        (operation.method === 'DELETE' || !ADDITIVE.test(operation.name))
     );
 }
 
@@ -94,16 +116,18 @@ export function registerTools(
             },
             async (input: OperationInput) => {
                 try {
-                    const result = await client.invoke(operation, input);
+                    const request = options.redactSecrets
+                        ? (restoreSecrets(input) as OperationInput)
+                        : input;
+                    const result = await client.invoke(operation, request);
                     if (result === undefined) return text('Success (no content).');
                     const payload = redact ? redactSecrets(result) : result;
-                    let output = JSON.stringify(payload, null, 2);
-                    if (redact && output.includes(REDACTED)) {
-                        output +=
-                            '\n\nNote: private keys and user credentials were replaced with ' +
-                            `"${REDACTED}". The values in the panel are unchanged.`;
-                    }
-                    return text(output);
+                    const output = JSON.stringify(payload, null, 2);
+                    return text(
+                        output,
+                        false,
+                        redact && output.includes(REDACTED_MARK) ? REDACTED_NOTE : undefined,
+                    );
                 } catch (error) {
                     return text(
                         `Error: ${error instanceof Error ? error.message : 'Remnawave API request failed'}`,

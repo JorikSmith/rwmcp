@@ -17,7 +17,7 @@ export interface Grant {
     readOnly: boolean;
     createdAt: number;
     lastUsedAt: number;
-    refreshHash: string;
+    refreshHashes: string[];
     refreshExpiresAt: number;
     previousRefreshHash?: string;
     previousRefreshValidUntil?: number;
@@ -69,6 +69,11 @@ export class Store {
         const now = Date.now();
         for (const grant of this.grants()) {
             if (grant.refreshExpiresAt <= now) delete this.state.grants[grant.id];
+            const legacy = grant as Grant & { refreshHash?: string };
+            if (!legacy.refreshHashes) {
+                legacy.refreshHashes = legacy.refreshHash ? [legacy.refreshHash] : [];
+                delete legacy.refreshHash;
+            }
         }
     }
 
@@ -141,7 +146,7 @@ export class Store {
         return this.grants().find(
             (grant) =>
                 grant.refreshExpiresAt > now &&
-                (grant.refreshHash === hash ||
+                (grant.refreshHashes.includes(hash) ||
                     (grant.previousRefreshHash === hash &&
                         (grant.previousRefreshValidUntil ?? 0) > now)),
         );
