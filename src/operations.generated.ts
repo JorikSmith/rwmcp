@@ -10139,7 +10139,7 @@ export const OPERATIONS: readonly OperationDescriptor[] = [
     ]
   },
   {
-    "name": "user_subscription_request_history_get_subscription_request_history",
+    "name": "get_subscription_request_history",
     "operationId": "UserSubscriptionRequestHistoryController_getSubscriptionRequestHistory",
     "method": "GET",
     "path": "/api/subscription-request-history",
@@ -10247,7 +10247,7 @@ export const OPERATIONS: readonly OperationDescriptor[] = [
     ]
   },
   {
-    "name": "user_subscription_request_history_get_subscription_request_history_stats",
+    "name": "get_subscription_request_history_stats",
     "operationId": "UserSubscriptionRequestHistoryController_getSubscriptionRequestHistoryStats",
     "method": "GET",
     "path": "/api/subscription-request-history/stats",

@@ -27,6 +27,7 @@ export interface PendingRequest {
     ip: string;
     createdAt: number;
     expiresAt: number;
+    readOnlyRequested: boolean;
     decision?: { approved: boolean; readOnly: boolean };
     authCode?: string;
 }
@@ -303,6 +304,7 @@ export class OAuthServer {
 
         this.prune();
         const ip = clientIp(request, this.config.trustProxy);
+        const scopes = (params.get('scope') ?? '').split(' ');
         const fromIp = [...this.pending.values()].filter((item) => item.ip === ip && !item.decision);
         if (fromIp.length >= MAX_PENDING_PER_IP) this.pending.delete(fromIp[0].id);
         if (this.pending.size >= MAX_PENDING) return fail('temporarily_unavailable');
@@ -317,6 +319,7 @@ export class OAuthServer {
             state,
             codeChallenge,
             ip,
+            readOnlyRequested: scopes.includes('read') && !scopes.includes('write'),
             createdAt: now,
             expiresAt: now + REQUEST_TTL_MS,
         };
@@ -421,7 +424,10 @@ export class OAuthServer {
     decide(code: string, approved: boolean, readOnly: boolean): PendingRequest | undefined {
         const pending = this.listPending().find((item) => item.code === code);
         if (!pending) return undefined;
-        pending.decision = { approved, readOnly: readOnly || this.config.readOnly };
+        pending.decision = {
+            approved,
+            readOnly: readOnly || pending.readOnlyRequested || this.config.readOnly,
+        };
         log(approved ? 'approval_granted' : 'approval_denied', {
             code,
             client: pending.clientName,

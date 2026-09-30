@@ -32,6 +32,17 @@ function toText(value: unknown): unknown {
     return typeof value === 'number' || typeof value === 'boolean' ? String(value) : value;
 }
 
+function restoring(schema: ZodTypeAny): ZodTypeAny {
+    return z.preprocess((value, context) => {
+        try {
+            return restoreSecrets(value);
+        } catch (error) {
+            context.addIssue({ code: z.ZodIssueCode.custom, message: (error as Error).message });
+            return z.NEVER;
+        }
+    }, schema);
+}
+
 function hasRequiredFields(schema: unknown, components: ComponentSchemas): boolean {
     const reference = (schema as { $ref?: unknown } | undefined)?.$ref;
     const target = (
@@ -121,7 +132,14 @@ export function registerTools(
             operation.name,
             {
                 description: description(operation),
-                inputSchema: inputShape(operation, components),
+                inputSchema: options.redactSecrets
+                    ? Object.fromEntries(
+                          Object.entries(inputShape(operation, components)).map(([key, schema]) => [
+                              key,
+                              restoring(schema),
+                          ]),
+                      )
+                    : inputShape(operation, components),
                 annotations: {
                     title: operation.summary,
                     readOnlyHint: operation.kind === 'read',
@@ -131,10 +149,7 @@ export function registerTools(
             },
             async (input: OperationInput) => {
                 try {
-                    const request = options.redactSecrets
-                        ? (restoreSecrets(input) as OperationInput)
-                        : input;
-                    const result = await client.invoke(operation, request);
+                    const result = await client.invoke(operation, input);
                     if (result === undefined) return text('Success (no content).');
                     const payload = redact ? redactSecrets(result) : result;
                     const output = JSON.stringify(payload, null, 2);

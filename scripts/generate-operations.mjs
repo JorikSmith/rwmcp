@@ -55,7 +55,8 @@ function toolName(operationId) {
             .replace(/^_+|_+$/g, '')
             .toLowerCase();
     const prefix = snake(controller.replace(/Controller$/, ''));
-    return action ? `${prefix}_${snake(action)}` : prefix;
+    const name = action ? `${prefix}_${snake(action)}` : prefix;
+    return name.length > 64 ? snake(action) : name;
 }
 
 function parameters(pathItem, operation) {

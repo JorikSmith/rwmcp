@@ -35,6 +35,7 @@ const LINK_PAYLOAD = /\b((?:vmess|ss):\/\/)([A-Za-z0-9+/=_-]{16,})(?=$|[#\s"'])/
 const salt = randomBytes(16);
 const byId = new Map<string, string>();
 const byValue = new Map<string, string>();
+const restored = new Set<string>();
 
 function placeholder(secret: string): string {
     let id = byValue.get(secret);
@@ -53,6 +54,11 @@ function placeholder(secret: string): string {
 
 function redactString(value: string): string {
     if (byValue.has(value)) return placeholder(value);
+    for (const secret of restored) {
+        for (const form of new Set([secret, encodeURIComponent(secret)])) {
+            if (value.includes(form)) value = value.split(form).join(placeholder(secret));
+        }
+    }
     return value
         .replace(
             LINK_USERINFO,
@@ -82,7 +88,10 @@ export function restoreSecrets(value: unknown): unknown {
         if (!value.includes(REDACTED_MARK)) return value;
         const id = PLACEHOLDER.exec(value)?.[1];
         const secret = id === undefined ? undefined : byId.get(id);
-        if (secret !== undefined) return secret;
+        if (secret !== undefined) {
+            restored.add(secret);
+            return secret;
+        }
         throw new Error(
             id === undefined
                 ? 'A redacted placeholder can only be passed as the whole field value, not inside other text.'

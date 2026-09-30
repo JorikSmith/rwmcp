@@ -26,6 +26,7 @@ export async function startAdminServer(oauth: OAuthServer, store: Store): Promis
                         client: item.clientName,
                         redirect: new URL(item.redirectUri).host,
                         ip: item.ip,
+                        readOnly: item.readOnlyRequested,
                         age: Math.round((Date.now() - item.createdAt) / 1000),
                     })),
                 );
@@ -105,7 +106,9 @@ export async function runAdminCommand(args: string[]): Promise<boolean> {
             const items = await call('GET', '/pending');
             if (!items.length) console.log('No pending requests.');
             for (const item of items) {
-                console.log(`${item.code}  ${item.client}  -> ${item.redirect}  from ${item.ip}, ${item.age}s ago`);
+                console.log(
+                    `${item.code}  ${item.client}${item.readOnly ? ' (read only)' : ''}  -> ${item.redirect}  from ${item.ip}, ${item.age}s ago`,
+                );
             }
             return true;
         }
