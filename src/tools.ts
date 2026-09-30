@@ -18,9 +18,26 @@ export interface ToolOptions {
 
 const ADDITIVE = /(^|_)(create|clone|add)(_|$)/;
 
-function isNumeric(schema: unknown): boolean {
-    const type = (schema as { type?: unknown } | undefined)?.type;
-    return type === 'number' || type === 'integer';
+function schemaType(schema: unknown): unknown {
+    return (schema as { type?: unknown } | undefined)?.type;
+}
+
+function toNumber(value: unknown): unknown {
+    return typeof value === 'string' && value.trim() && !Number.isNaN(Number(value))
+        ? Number(value)
+        : value;
+}
+
+function toText(value: unknown): unknown {
+    return typeof value === 'number' || typeof value === 'boolean' ? String(value) : value;
+}
+
+function hasRequiredFields(schema: unknown, components: ComponentSchemas): boolean {
+    const reference = (schema as { $ref?: unknown } | undefined)?.$ref;
+    const target = (
+        typeof reference === 'string' ? components[reference.split('/').pop() ?? ''] : schema
+    ) as { type?: unknown; required?: unknown } | undefined;
+    return target?.type !== 'object' || (Array.isArray(target.required) && target.required.length > 0);
 }
 
 function parameterObject(
@@ -31,15 +48,9 @@ function parameterObject(
     const fields: Record<string, ZodTypeAny> = {};
     for (const parameter of parameters) {
         let schema = openApiSchema(parameter.schema, components);
-        if (isNumeric(parameter.schema)) {
-            schema = z.preprocess(
-                (value) =>
-                    typeof value === 'string' && value.trim() && !Number.isNaN(Number(value))
-                        ? Number(value)
-                        : value,
-                schema,
-            );
-        }
+        const type = schemaType(parameter.schema);
+        if (type === 'number' || type === 'integer') schema = z.preprocess(toNumber, schema);
+        if (type === 'string') schema = z.preprocess(toText, schema);
         if (parameter.description) schema = schema.describe(parameter.description);
         fields[parameter.name] = parameter.required ? schema : schema.optional();
     }
@@ -63,7 +74,11 @@ export function inputShape(
         if (operation.requestBody.description) {
             body = body.describe(operation.requestBody.description);
         }
-        shape.body = operation.requestBody.required ? body : body.optional();
+        shape.body =
+            operation.requestBody.required &&
+            hasRequiredFields(operation.requestBody.schema, components)
+                ? body
+                : body.optional();
     }
     return shape;
 }

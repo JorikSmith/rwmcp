@@ -89,15 +89,16 @@ export class PanelClient {
             input.query ?? {},
         );
 
+        const payload = input.body ?? (operation.requestBody?.required ? {} : undefined);
         const headers = panelHeaders(this.config);
-        if (input.body !== undefined) headers['Content-Type'] = 'application/json';
+        if (payload !== undefined) headers['Content-Type'] = 'application/json';
 
         let response: Response;
         try {
             response = await fetch(url, {
                 method: operation.method,
                 headers,
-                body: input.body === undefined ? undefined : JSON.stringify(input.body),
+                body: payload === undefined ? undefined : JSON.stringify(payload),
                 signal: AbortSignal.timeout(TIMEOUT_MS),
             });
         } catch (error) {
@@ -152,22 +153,15 @@ export class PanelClient {
                 }
                 continue;
             }
-            if (parameter.style === 'deepObject') {
-                if (!isRecord(value)) {
-                    throw new Error(`Query parameter ${parameter.name} must be an object`);
-                }
-                for (const [key, nested] of Object.entries(value)) {
-                    if (nested === undefined || nested === null) continue;
-                    for (const item of Array.isArray(nested) ? nested : [nested]) {
-                        search.append(`${parameter.name}[${key}]`, valueToString(item));
-                    }
-                }
+            if (
+                isRecord(value) ||
+                (Array.isArray(value) && value.some((item) => typeof item === 'object' && item !== null))
+            ) {
+                search.append(parameter.name, JSON.stringify(value));
                 continue;
             }
             if (Array.isArray(value)) {
-                if (value.some((item) => typeof item === 'object' && item !== null)) {
-                    search.append(parameter.name, JSON.stringify(value));
-                } else if (parameter.explode) {
+                if (parameter.explode) {
                     value.forEach((item) => search.append(parameter.name, valueToString(item)));
                 } else {
                     search.append(parameter.name, value.map(valueToString).join(','));
